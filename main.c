@@ -89,9 +89,15 @@ i32 main() {
         u64 delta_nice = nice2 - nice;
 
         u64 total = delta_user + delta_sys + delta_idle + delta_nice;
-        u64 busy = total - delta_idle;
+        u64 busy_total = total - delta_idle;
+        u64 busy_user = busy_total - delta_sys;
+        u64 busy_sys = busy_total - delta_user;
 
-        printf("\rCPU: %.1lf%%\033[K", (double)busy / (double)total * 100.0);
+        printf("\rCPU: %.1lf%% System: %.1lf%% User: %.1lf%%\033[K",
+            (double)busy_total / (double)total * 100.0,
+            (double)busy_sys / (double)total * 100.0,
+            (double)busy_user / (double)total * 100.0);
+
         fflush(stdout);
     }
 
