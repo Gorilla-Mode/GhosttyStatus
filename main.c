@@ -38,8 +38,8 @@ i32 main() {
 
     tcsetattr(STDIN_FILENO, TCSANOW, &new_termios);
 
-    printf("\033[?25l"); //Hide cursor
-    printf("\033[2J"); // clear
+    printf("\033[?25l\033[2J\033[H"); //Hide cursor, clear move to 1 row
+    printf("Cpu Usage:\n");
     fflush(stdout);
 
     const host_t host = mach_host_self();
@@ -127,7 +127,7 @@ i32 main() {
         u64 busy_user = busy_total - delta_sys;
         u64 busy_sys = busy_total - delta_user;
 
-        printf("\rCPU: %.1lf%% System: %.1lf%% User: %.1lf%%\033[K",
+        printf("\rTotal: %.1lf%% System: %.1lf%% User: %.1lf%%\033[K",
             (double)busy_total / (double)total * 100.0,
             (double)busy_sys / (double)total * 100.0,
             (double)busy_user / (double)total * 100.0);
