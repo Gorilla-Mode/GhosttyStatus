@@ -113,7 +113,7 @@ i32 main() {
             idle2 += info2[cpu * CPU_STATE_MAX + CPU_STATE_IDLE];
             nice2 += info2[cpu * CPU_STATE_MAX + CPU_STATE_NICE];
         }
-        
+
         vm_deallocate(mach_task_self(), (vm_address_t)info2,
                       (vm_size_t)count2 * sizeof(*info2));
 
