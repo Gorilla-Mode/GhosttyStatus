@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdint.h>
+#include <signal.h>
 #include <unistd.h>
 #include <mach/mach.h>
 
@@ -16,7 +17,17 @@ typedef uint64_t u64;
 #include <stdio.h>
 #include <termios.h>
 
+static volatile sig_atomic_t running = 1;
+
+static void stop(int signal_number) {
+    (void)signal_number;
+    running = 0;
+}
+
 i32 main() {
+    signal(SIGTERM, stop);
+    signal(SIGINT, stop);
+
     struct termios old_termios;
     struct termios new_termios;
 
@@ -33,7 +44,7 @@ i32 main() {
 
     const host_t host = mach_host_self();
 
-    while (true)
+    while (running)
     {
 
         processor_info_array_t info;
@@ -70,6 +81,9 @@ i32 main() {
 
         usleep(1000000);
 
+        if (!running)
+            break;
+
         processor_info_array_t info2;
         mach_msg_type_number_t count2;
 
@@ -99,6 +113,7 @@ i32 main() {
             idle2 += info2[cpu * CPU_STATE_MAX + CPU_STATE_IDLE];
             nice2 += info2[cpu * CPU_STATE_MAX + CPU_STATE_NICE];
         }
+
         vm_deallocate(mach_task_self(), (vm_address_t)info2,
                       (vm_size_t)count2 * sizeof(*info2));
 
