@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <signal.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <mach/mach.h>
 
@@ -96,15 +97,19 @@ static void cpu_usage(rgb color_background, rgb color_text)
     u64 busy_user = busy_total - delta_sys;
     u64 busy_sys = busy_total - delta_user;
 
-    printf("\r"
-        "\033[38;2;%d;%d;%dm"     // Text
-        "\033[48;2;%d;%d;%dm"   // Background
-        "Total: %.1lf%% System: %.1lf%% User: %.1lf%%\033[K",
+    char* text;
+
+    if (0 > asprintf(&text, "\033[38;2;%d;%d;%dm"
+        "\033[48;2;%d;%d;%dm"
+        "Total: %.1lf%% System: %.1lf%% User: %.1lf%% |\033[K",
         color_text.r, color_text.g, color_text.b,
         color_background.r, color_background.g, color_background.b,
         (double)busy_total / (double)total * 100.0,
         (double)busy_sys / (double)total * 100.0,
-        (double)busy_user / (double)total * 100.0);
+        (double)busy_user / (double)total * 100.0))
+        return;
+
+    printf("\r%s", text);
 
     fflush(stdout);
 }
@@ -128,8 +133,8 @@ i32 main()
     rgb cpu_color_text = { .r = 20, .g = 20, .b = 20 };
 
     printf("\033[?25l\033[2J\033[H"); //Hide cursor, clear, move to 1 row
-    printf("\033[38;2;%d;%d;%dm"     // Text
-           "\033[48;2;%d;%d;%dm"   // Background
+    printf("\033[38;2;%d;%d;%dm"      // Text
+           "\033[48;2;%d;%d;%dm"      // Background
            "CPU Usage Monitor"
            "\033[0m\n",
            cpu_color_text.r, cpu_color_text.g, cpu_color_text.b,
