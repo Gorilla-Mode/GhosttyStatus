@@ -97,16 +97,28 @@ static void cpu_usage(rgb color_background, rgb color_text)
     u64 busy_user = busy_total - delta_sys;
     u64 busy_sys = busy_total - delta_user;
 
+    char* total_text;
+    char* system_text;
+    char* user_text;
+    
+    if (0 > asprintf(&total_text, "%.1lf%%",
+        (double)busy_total / (double)total * 100.0))
+        return;
+    if (0 > asprintf(&system_text, "%.1lf%%",
+        (double)busy_sys / (double)total * 100.0))
+        return;
+    if (0 > asprintf(&user_text, "%.1lf%%",
+        (double)busy_user / (double)total * 100.0))
+        return;
+
     char* text;
 
     if (0 > asprintf(&text, "\033[38;2;%d;%d;%dm"
         "\033[48;2;%d;%d;%dm"
-        "Total: %.1lf%% System: %.1lf%% User: %.1lf%% |\033[K",
+        "Total: %-6s System: %-6s User: %-6s |\033[K",
         color_text.r, color_text.g, color_text.b,
         color_background.r, color_background.g, color_background.b,
-        (double)busy_total / (double)total * 100.0,
-        (double)busy_sys / (double)total * 100.0,
-        (double)busy_user / (double)total * 100.0))
+        total_text, system_text, user_text))
         return;
 
     printf("\r%s", text);
