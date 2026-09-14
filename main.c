@@ -25,7 +25,14 @@ static void stop(int signal_number)
     running = 0;
 }
 
-static void cpu_usage()
+typedef struct
+{
+    u8 r;
+    u8 g;
+    u8 b;
+}rgb;
+
+static void cpu_usage(rgb color_background, rgb color_text)
 {
     typedef struct
     {
@@ -89,7 +96,12 @@ static void cpu_usage()
     u64 busy_user = busy_total - delta_sys;
     u64 busy_sys = busy_total - delta_user;
 
-    printf("\rTotal: %.1lf%% System: %.1lf%% User: %.1lf%%\033[K",
+    printf("\r"
+        "\033[38;2;%d;%d;%dm"     // Text
+        "\033[48;2;%d;%d;%dm"   // Background
+        "Total: %.1lf%% System: %.1lf%% User: %.1lf%%\033[K",
+        color_text.r, color_text.g, color_text.b,
+        color_background.r, color_background.g, color_background.b,
         (double)busy_total / (double)total * 100.0,
         (double)busy_sys / (double)total * 100.0,
         (double)busy_user / (double)total * 100.0);
@@ -112,19 +124,28 @@ i32 main()
 
     tcsetattr(STDIN_FILENO, TCSANOW, &new_termios);
 
+    rgb cpu_color_background = { .r = 57, .g = 57, .b = 60 };
+    rgb cpu_color_text = { .r = 20, .g = 20, .b = 20 };
+
     printf("\033[?25l\033[2J\033[H"); //Hide cursor, clear, move to 1 row
-    printf("Cpu Usage:\n");
+    printf("\033[38;2;%d;%d;%dm"     // Text
+           "\033[48;2;%d;%d;%dm"   // Background
+           "CPU Usage Monitor"
+           "\033[0m\n",
+           cpu_color_text.r, cpu_color_text.g, cpu_color_text.b,
+           cpu_color_background.r, cpu_color_background.g, cpu_color_background.b);
     fflush(stdout);
 
     while (running)
     {
-        cpu_usage();
+        cpu_usage(cpu_color_background, cpu_color_text);
 
         if (running)
             usleep(1000000);
     }
 
     tcsetattr(STDIN_FILENO, TCSANOW, &old_termios);
+    printf("\033[0m\n");  // Reset text color.
     printf("\033[?25h\n"); // Restore cursor.
     return 0;
 }
