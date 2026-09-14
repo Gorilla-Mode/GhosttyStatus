@@ -2,6 +2,8 @@
 #include <stdint.h>
 #include <signal.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/ioctl.h>
 #include <unistd.h>
 #include <mach/mach.h>
 
@@ -15,7 +17,6 @@ typedef uint16_t u16;
 typedef uint32_t u32;
 typedef uint64_t u64;
 
-#include <stdio.h>
 #include <termios.h>
 
 static volatile sig_atomic_t running = 1;
@@ -33,7 +34,102 @@ typedef struct
     u8 b;
 }rgb;
 
-static void cpu_usage(rgb color_background, rgb color_text)
+typedef struct
+{
+    const char* header;
+    char* text;
+    size_t width;
+} component;
+
+typedef struct
+{
+    char* header;
+    char* text;
+    size_t width;
+    size_t position;
+} status_bar;
+
+static void bar_end(status_bar* bar)
+{
+    free(bar->header);
+    free(bar->text);
+    *bar = (status_bar){0};
+}
+
+static int bar_begin(status_bar* bar)
+{
+    struct winsize size = {0};
+    *bar = (status_bar){ .width = 80, .position = 0 };
+
+    if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &size) == 0 && size.ws_col > 0)
+        bar->width = size.ws_col;
+
+    bar->header = malloc(bar->width + 1);
+    bar->text = malloc(bar->width + 1);
+    if (!bar->header || !bar->text)
+    {
+        bar_end(bar);
+        return 0;
+    }
+
+    memset(bar->header, ' ', bar->width);
+    memset(bar->text, ' ', bar->width);
+    bar->header[bar->width] = '\0';
+    bar->text[bar->width] = '\0';
+    return 1;
+}
+
+static void bar_copy(char* row, size_t position, size_t width, const char* text)
+{
+    if (!text)
+        return;
+
+    size_t length = strlen(text);
+    if (length > width)
+        length = width;
+    memcpy(row + position, text, length);
+}
+
+// Appending consumes the allocated text, even when the component is clipped.
+static void bar_append(status_bar* bar, component item)
+{
+    if (item.width > 0 && bar->position < bar->width)
+    {
+        if (bar->position > 0)
+        {
+            size_t gap = bar->width - bar->position;
+            if (gap > 3)
+                gap = 3;
+            bar_copy(bar->header, bar->position, gap, " | ");
+            bar_copy(bar->text, bar->position, gap, " | ");
+            bar->position += gap;
+        }
+
+        size_t width = bar->width - bar->position;
+        if (width > item.width)
+            width = item.width;
+        bar_copy(bar->header, bar->position, width, item.header);
+        bar_copy(bar->text, bar->position, width, item.text);
+        bar->position += width;
+    }
+
+    free(item.text);
+}
+
+static void bar_draw(const status_bar* bar, rgb color_background, rgb color_text)
+{
+    printf("\033[38;2;%d;%d;%dm"
+           "\033[48;2;%d;%d;%dm"
+           "\033[1;1H\r%s"
+           "\033[2;1H\r%s"
+           "\033[2;1H\r",
+           color_text.r, color_text.g, color_text.b,
+           color_background.r, color_background.g, color_background.b,
+           bar->header, bar->text);
+    fflush(stdout);
+}
+
+static component cpu_usage()
 {
     typedef struct
     {
@@ -43,6 +139,10 @@ static void cpu_usage(rgb color_background, rgb color_text)
         u64 nice;
         int initialized;
     } cpu_sample;
+
+    component output = { .header = "CPU Usage Monitor", .width = 41 };
+    if (0 > asprintf(&output.text, "Total: %-6s System: %-6s User: %-6s", "--", "--", "--"))
+        output.text = nullptr;
 
     static cpu_sample previous = {0};
     const host_t host = mach_host_self();
@@ -60,9 +160,7 @@ static void cpu_usage(rgb color_background, rgb color_text)
     mach_port_deallocate(mach_task_self(), host);
 
     if (result != KERN_SUCCESS)
-    {
-        return;
-    }
+        return output;
 
     cpu_sample current = { .initialized = 1 };
 
@@ -80,7 +178,8 @@ static void cpu_usage(rgb color_background, rgb color_text)
     if (!previous.initialized)
     {
         previous = current;
-        return;
+
+        return output;
     }
 
     u64 delta_user = current.user - previous.user;
@@ -91,39 +190,50 @@ static void cpu_usage(rgb color_background, rgb color_text)
 
     u64 total = delta_user + delta_sys + delta_idle + delta_nice;
     if (total == 0)
-        return;
+        return output;
 
     u64 busy_total = total - delta_idle;
     u64 busy_user = busy_total - delta_sys;
     u64 busy_sys = busy_total - delta_user;
 
-    char* total_text;
-    char* system_text;
-    char* user_text;
-    
+    char* total_text = nullptr;
+    char* system_text = nullptr;
+    char* user_text = nullptr;
+
     if (0 > asprintf(&total_text, "%.1lf%%",
         (double)busy_total / (double)total * 100.0))
-        return;
+        return output;
     if (0 > asprintf(&system_text, "%.1lf%%",
         (double)busy_sys / (double)total * 100.0))
-        return;
+    {
+        free(total_text);
+
+        return output;
+    }
     if (0 > asprintf(&user_text, "%.1lf%%",
         (double)busy_user / (double)total * 100.0))
-        return;
+    {
+        free(total_text);
+        free(system_text);
 
-    char* text;
+        return output;
+    }
 
-    if (0 > asprintf(&text, "\033[38;2;%d;%d;%dm"
-        "\033[48;2;%d;%d;%dm"
-        "Total: %-6s System: %-6s User: %-6s |\033[K",
-        color_text.r, color_text.g, color_text.b,
-        color_background.r, color_background.g, color_background.b,
-        total_text, system_text, user_text))
-        return;
+    char* text = nullptr;
 
-    printf("\r%s", text);
+    int length = asprintf(&text, "Total: %-6s System: %-6s User: %-6s",
+        total_text, system_text, user_text);
 
-    fflush(stdout);
+    free(total_text);
+    free(system_text);
+    free(user_text);
+
+    if (length < 0)
+        return output;
+
+    free(output.text);
+    output.text = text;
+    return output;
 }
 
 i32 main()
@@ -141,21 +251,23 @@ i32 main()
 
     tcsetattr(STDIN_FILENO, TCSANOW, &new_termios);
 
-    rgb cpu_color_background = { .r = 57, .g = 57, .b = 60 };
-    rgb cpu_color_text = { .r = 20, .g = 20, .b = 20 };
+    rgb color_background = { .r = 57, .g = 57, .b = 60 };
+    rgb color_text = { .r = 20, .g = 20, .b = 20 };
 
     printf("\033[?25l\033[2J\033[H"); //Hide cursor, clear, move to 1 row
-    printf("\033[38;2;%d;%d;%dm"      // Text
-           "\033[48;2;%d;%d;%dm"      // Background
-           "CPU Usage Monitor"
-           "\033[0m\n",
-           cpu_color_text.r, cpu_color_text.g, cpu_color_text.b,
-           cpu_color_background.r, cpu_color_background.g, cpu_color_background.b);
     fflush(stdout);
 
     while (running)
     {
-        cpu_usage(cpu_color_background, cpu_color_text);
+        status_bar bar;
+        if (bar_begin(&bar))
+        {
+            component cpu = cpu_usage();
+
+            bar_append(&bar, cpu);
+            bar_draw(&bar, color_background, color_text);
+            bar_end(&bar);
+        }
 
         if (running)
             usleep(1000000);
