@@ -251,8 +251,8 @@ i32 main()
 
     tcsetattr(STDIN_FILENO, TCSANOW, &new_termios);
 
-    rgb color_background = { .r = 57, .g = 57, .b = 60 };
-    rgb color_text = { .r = 20, .g = 20, .b = 20 };
+    rgb color_background = { .r = 40, .g = 40, .b = 40 };
+    rgb color_text = { .r = 103, .g = 103, .b = 99 };
 
     printf("\033[?25l\033[2J\033[H"); //Hide cursor, clear, move to 1 row
     fflush(stdout);
