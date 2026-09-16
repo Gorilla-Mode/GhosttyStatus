@@ -87,17 +87,17 @@ static component cpu_usage()
     char* user_text = nullptr;
 
     if (0 > asprintf(&total_text, "%.1lf%%",
-        (double)busy_total / (double)total * 100.0))
+        (f64)busy_total / (f64)total * 100.0))
         return output;
     if (0 > asprintf(&system_text, "%.1lf%%",
-        (double)busy_sys / (double)total * 100.0))
+        (f64)busy_sys / (f64)total * 100.0))
     {
         free(total_text);
 
         return output;
     }
     if (0 > asprintf(&user_text, "%.1lf%%",
-        (double)busy_user / (double)total * 100.0))
+        (f64)busy_user / (f64)total * 100.0))
     {
         free(total_text);
         free(system_text);
