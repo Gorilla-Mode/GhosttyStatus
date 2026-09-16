@@ -129,22 +129,17 @@ static void bar_draw(const status_bar* bar, rgb color_background, rgb color_text
     fflush(stdout);
 }
 
-static component cpu_usage()
+typedef struct
 {
-    typedef struct
-    {
-        u64 user;
-        u64 sys;
-        u64 idle;
-        u64 nice;
-        int initialized;
-    } cpu_sample;
+    u64 user;
+    u64 sys;
+    u64 idle;
+    u64 nice;
+    int initialized;
+} cpu_sample;
 
-    component output = { .header = "CPU Usage Monitor", .width = 41 };
-    if (0 > asprintf(&output.text, "Total: %-6s System: %-6s User: %-6s", "--", "--", "--"))
-        output.text = nullptr;
-
-    static cpu_sample previous = {0};
+static cpu_sample sample_cpu(void)
+{
     const host_t host = mach_host_self();
     processor_info_array_t info;
     mach_msg_type_number_t count;
@@ -160,7 +155,7 @@ static component cpu_usage()
     mach_port_deallocate(mach_task_self(), host);
 
     if (result != KERN_SUCCESS)
-        return output;
+        return (cpu_sample){0};
 
     cpu_sample current = { .initialized = 1 };
 
@@ -174,6 +169,20 @@ static component cpu_usage()
 
     vm_deallocate(mach_task_self(), (vm_address_t)info,
                   (vm_size_t)count * sizeof(*info));
+
+    return current;
+}
+
+static component cpu_usage()
+{
+    component output = { .header = "CPU Usage Monitor", .width = 41 };
+    if (0 > asprintf(&output.text, "Total: %-6s System: %-6s User: %-6s", "--", "--", "--"))
+        output.text = nullptr;
+
+    static cpu_sample previous = {0};
+    cpu_sample current = sample_cpu();
+    if (!current.initialized)
+        return output;
 
     if (!previous.initialized)
     {
