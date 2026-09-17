@@ -17,6 +17,13 @@ static void stop(int signal_number)
     running = 0;
 }
 
+typedef struct
+{
+    component cpu;
+    cpu_history history;
+    component cpu_timeline;
+}state;
+
 i32 main()
 {
     signal(SIGTERM, stop);
@@ -32,6 +39,7 @@ i32 main()
 
     tcsetattr(STDIN_FILENO, TCSANOW, &new_termios);
 
+    state s = {0};
     rgb color_background = { .r = 40, .g = 40, .b = 40 };
     rgb color_text = { .r = 103, .g = 103, .b = 99 };
 
@@ -43,9 +51,12 @@ i32 main()
         status_bar bar;
         if (bar_begin(&bar))
         {
-            component cpu = cpu_usage();
+            s.cpu = cpu_usage();
+            s.cpu_timeline = cpu_timeline(&s.history);
+            append_sample(&s.history, sample_cpu());
 
-            bar_append(&bar, cpu);
+            bar_append(&bar, s.cpu);
+            bar_append(&bar, s.cpu_timeline);
             bar_draw(&bar, color_background, color_text);
             bar_end(&bar);
         }

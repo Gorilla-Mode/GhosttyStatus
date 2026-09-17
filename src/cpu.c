@@ -15,6 +15,35 @@ typedef struct
     int initialized;
 } cpu_sample;
 
+typedef struct
+{
+    cpu_sample samples[10];
+    size_t index;
+} cpu_history;
+
+static void append_sample(cpu_history* history, cpu_sample sample)
+{
+    history->samples[history->index] = sample;
+    history->index = (history->index + 1) % 10;
+}
+
+static component cpu_timeline(cpu_history* history)
+{
+    component output = { .header = "CPU Usage Monitor", .width = 41 };
+
+    if (0 > asprintf(&output.text, "Total: %-6s System: %-6s User: %-6s", "--", "--", "--"))
+        output.text = nullptr;
+
+    char* text = nullptr;
+
+    if (0 > asprintf(&text, "Latest: %llu", (unsigned long long)history->samples[0].user))
+        return output;
+
+    free(output.text);
+    output.text = text;
+    return output;
+}
+
 static cpu_sample sample_cpu(void)
 {
     const host_t host = mach_host_self();
