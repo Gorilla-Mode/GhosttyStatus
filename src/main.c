@@ -53,7 +53,7 @@ i32 main()
         {
             s.cpu = cpu_usage();
             s.cpu_timeline = cpu_timeline(&s.history);
-            append_sample(&s.history, sample_cpu());
+            append_sample(&s.history);
 
             bar_append(&bar, s.cpu);
             bar_append(&bar, s.cpu_timeline);

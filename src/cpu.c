@@ -17,32 +17,17 @@ typedef struct
 
 typedef struct
 {
-    cpu_sample samples[10];
+    u64 user;
+    u64 sys;
+    u64 idle;
+    u64 nice;
+}cpu_delta;
+
+typedef struct
+{
+    f64 samples[10];
     size_t index;
 } cpu_history;
-
-static void append_sample(cpu_history* history, cpu_sample sample)
-{
-    history->samples[history->index] = sample;
-    history->index = (history->index + 1) % 10;
-}
-
-static component cpu_timeline(cpu_history* history)
-{
-    component output = { .header = "CPU Usage Monitor", .width = 41 };
-
-    if (0 > asprintf(&output.text, "Total: %-6s System: %-6s User: %-6s", "--", "--", "--"))
-        output.text = nullptr;
-
-    char* text = nullptr;
-
-    if (0 > asprintf(&text, "Latest: %llu", (unsigned long long)history->samples[0].user))
-        return output;
-
-    free(output.text);
-    output.text = text;
-    return output;
-}
 
 static cpu_sample sample_cpu(void)
 {
@@ -79,9 +64,89 @@ static cpu_sample sample_cpu(void)
     return current;
 }
 
+cpu_delta get_cpu_delta(cpu_sample start, cpu_sample end)
+{
+    cpu_delta delta = {0};
+
+    delta.user = end.user - start.user;
+    delta.sys = end.sys - start.sys;
+    delta.idle = end.idle - start.idle;
+    delta.nice = end.nice - start.nice;
+
+    return delta;
+}
+
+static void append_sample(cpu_history* history)
+{
+    static cpu_sample previous = {0};
+    cpu_sample current = sample_cpu();
+    if (!current.initialized)
+        return;
+
+    if (!previous.initialized)
+    {
+        previous = current;
+    }
+
+    cpu_delta d = get_cpu_delta(previous, current);
+    previous = current;
+
+    u64 total = d.user + d.sys + d.idle + d.nice;
+    if (total == 0)
+        return;
+
+    u64 busy_total = total - d.idle;
+    f64 usage = (f64)busy_total / (f64)total * 100.0;
+
+    history->samples[history->index] = usage;
+    history->index = (history->index + 1) % 10;
+}
+
+static component cpu_timeline(const cpu_history* history)
+{
+    component output = { .header = "CPU Timeline", .width = 41 };
+
+    if (0 > asprintf(&output.text, "Total: %-6s System: %-6s User: %-6s", "--", "--", "--"))
+        output.text = nullptr;
+
+    char* text = nullptr;
+
+
+    for (size_t i = 0; i < 10; i++)
+    {
+        char* sample = nullptr;
+        if (0 > asprintf(&sample, "%.1lf%%", history->samples[i]))
+        {
+            free(text);
+            return output;
+        }
+        if (i == 0)
+        {
+            text = sample;
+        }
+        else
+        {
+            char* new_text = nullptr;
+            if (0 > asprintf(&new_text, "%s %s", text, sample))
+            {
+                free(text);
+                free(sample);
+                return output;
+            }
+            free(text);
+            free(sample);
+            text = new_text;
+        }
+    }
+
+    free(output.text);
+    output.text = text;
+    return output;
+}
+
 static component cpu_usage()
 {
-    component output = { .header = "CPU Usage Monitor", .width = 41 };
+    component output = { .header = "CPU", .width = 41 };
     if (0 > asprintf(&output.text, "Total: %-6s System: %-6s User: %-6s", "--", "--", "--"))
         output.text = nullptr;
 
@@ -97,19 +162,16 @@ static component cpu_usage()
         return output;
     }
 
-    u64 delta_user = current.user - previous.user;
-    u64 delta_sys = current.sys - previous.sys;
-    u64 delta_idle = current.idle - previous.idle;
-    u64 delta_nice = current.nice - previous.nice;
+    cpu_delta d = get_cpu_delta(previous, current);
     previous = current;
 
-    u64 total = delta_user + delta_sys + delta_idle + delta_nice;
+    u64 total = d.user + d.sys + d.idle + d.nice;
     if (total == 0)
         return output;
 
-    u64 busy_total = total - delta_idle;
-    u64 busy_user = busy_total - delta_sys;
-    u64 busy_sys = busy_total - delta_user;
+    u64 busy_total = total - d.idle;
+    u64 busy_user = busy_total - d.sys;
+    u64 busy_sys = busy_total - d.user;
 
     char* total_text = nullptr;
     char* system_text = nullptr;

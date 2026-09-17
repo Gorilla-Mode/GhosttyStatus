@@ -36,3 +36,8 @@ typedef struct
     size_t width;
     size_t position;
 } status_bar;
+
+u64 delta(u64 start, u64 end)
+{
+    return end - start;
+}
