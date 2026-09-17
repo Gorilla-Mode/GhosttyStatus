@@ -1,5 +1,5 @@
 #ifndef UNITY_BUILD
-#include "ds.c"
+#include "state.c"
 #endif
 
 #include <stdio.h>
@@ -14,18 +14,7 @@ typedef struct
     u64 sys;
     u64 idle;
     u64 nice;
-    int initialized;
-} cpu_sample;
-
-typedef struct
-{
-    u64 user;
-    u64 sys;
-    u64 idle;
-    u64 nice;
 }cpu_delta;
-
-typedef f64_list cpu_history;
 
 static cpu_sample sample_cpu(void)
 {
@@ -62,32 +51,24 @@ static cpu_sample sample_cpu(void)
     return current;
 }
 
-cpu_delta get_cpu_delta(cpu_sample start, cpu_sample end)
+cpu_delta get_cpu_delta(const state* s)
 {
     cpu_delta delta = {0};
 
-    delta.user = end.user - start.user;
-    delta.sys = end.sys - start.sys;
-    delta.idle = end.idle - start.idle;
-    delta.nice = end.nice - start.nice;
+    if (!s->previous_cpu.initialized || !s->current_cpu.initialized)
+        return delta;
+
+    delta.user = s->current_cpu.user - s->previous_cpu.user;
+    delta.sys = s->current_cpu.sys - s->previous_cpu.sys;
+    delta.idle = s->current_cpu.idle - s->previous_cpu.idle;
+    delta.nice = s->current_cpu.nice - s->previous_cpu.nice;
 
     return delta;
 }
 
-static void append_sample(cpu_history* history)
+static void append_sample(state* s)
 {
-    static cpu_sample previous = {0};
-    cpu_sample current = sample_cpu();
-    if (!current.initialized)
-        return;
-
-    if (!previous.initialized)
-    {
-        previous = current;
-    }
-
-    cpu_delta d = get_cpu_delta(previous, current);
-    previous = current;
+    cpu_delta d = get_cpu_delta(s);
 
     u64 total = d.user + d.sys + d.idle + d.nice;
     if (total == 0)
@@ -96,7 +77,7 @@ static void append_sample(cpu_history* history)
     u64 busy_total = total - d.idle;
     f64 usage = (f64)busy_total / (f64)total * 100.0;
 
-    f64_list_append(history, usage, CPU_HISTORY_LIMIT);
+    f64_list_append(&s->history, usage, CPU_HISTORY_LIMIT);
 }
 
 static component cpu_timeline(const cpu_history* history)
@@ -129,26 +110,13 @@ static component cpu_timeline(const cpu_history* history)
     return output;
 }
 
-static component cpu_usage()
+static component cpu_usage(const state* s)
 {
     component output = { .header = "CPU", .width = 41 };
     if (0 > asprintf(&output.text, "Total: %-6s System: %-6s User: %-6s", "--", "--", "--"))
         output.text = nullptr;
 
-    static cpu_sample previous = {0};
-    cpu_sample current = sample_cpu();
-    if (!current.initialized)
-        return output;
-
-    if (!previous.initialized)
-    {
-        previous = current;
-
-        return output;
-    }
-
-    cpu_delta d = get_cpu_delta(previous, current);
-    previous = current;
+    cpu_delta d = get_cpu_delta(s);
 
     u64 total = d.user + d.sys + d.idle + d.nice;
     if (total == 0)

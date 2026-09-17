@@ -7,6 +7,7 @@
 
 #include "global_typedefs.c"
 #include "ds.c"
+#include "state.c"
 #include "cpu.c"
 #include "bar.c"
 
@@ -18,12 +19,12 @@ static void stop(int signal_number)
     running = 0;
 }
 
-typedef struct
+static void update_state(state* s)
 {
-    component cpu;
-    cpu_history history;
-    component cpu_timeline;
-}state;
+    if (s->current_cpu.initialized)
+        s->previous_cpu = s->current_cpu;
+    s->current_cpu = sample_cpu();
+}
 
 i32 main()
 {
@@ -49,12 +50,14 @@ i32 main()
 
     while (running)
     {
+        update_state(&s);
+
         status_bar bar;
         if (bar_begin(&bar))
         {
-            s.cpu = cpu_usage();
+            s.cpu = cpu_usage(&s);
             s.cpu_timeline = cpu_timeline(&s.history);
-            append_sample(&s.history);
+            append_sample(&s);
 
             bar_append(&bar, s.cpu);
             bar_append(&bar, s.cpu_timeline);

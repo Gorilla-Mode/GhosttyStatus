@@ -17,6 +17,15 @@ typedef double f64;
 
 typedef struct
 {
+    u64 user;
+    u64 sys;
+    u64 idle;
+    u64 nice;
+    int initialized;
+} cpu_sample;
+
+typedef struct
+{
     u8 r;
     u8 g;
     u8 b;
