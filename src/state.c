@@ -11,4 +11,6 @@ typedef struct
     component cpu_timeline;
     cpu_sample previous_cpu;
     cpu_sample current_cpu;
+    mem_sample current_mem;
+    component mem;
 } state;
