@@ -24,6 +24,10 @@ static void update_state(state* s)
     if (s->current_cpu.initialized)
         s->previous_cpu = s->current_cpu;
     s->current_cpu = sample_cpu();
+    append_sample(s);
+
+    s->cpu = cpu_usage(s);
+    s->cpu_timeline = cpu_timeline(&s->history);
 }
 
 i32 main()
@@ -55,10 +59,6 @@ i32 main()
         status_bar bar;
         if (bar_begin(&bar))
         {
-            s.cpu = cpu_usage(&s);
-            s.cpu_timeline = cpu_timeline(&s.history);
-            append_sample(&s);
-
             bar_append(&bar, s.cpu);
             bar_append(&bar, s.cpu_timeline);
             bar_draw(&bar, color_background, color_text);
