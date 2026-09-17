@@ -26,6 +26,13 @@ typedef struct
 
 typedef struct
 {
+    u64 used_bytes;
+    u64 total_bytes;
+    int initialized;
+} mem_sample;
+
+typedef struct
+{
     u8 r;
     u8 g;
     u8 b;
