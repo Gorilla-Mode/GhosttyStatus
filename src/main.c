@@ -60,7 +60,7 @@ i32 main()
         if (bar_begin(&bar))
         {
             bar_append(&bar, s.cpu);
-            bar_append(&bar, s.cpu_timeline);
+            //bar_append(&bar, s.cpu_timeline);
             bar_draw(&bar, color_background, color_text);
             bar_end(&bar);
         }
