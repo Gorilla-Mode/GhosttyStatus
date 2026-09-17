@@ -6,6 +6,7 @@
 #include <termios.h>
 
 #include "global_typedefs.c"
+#include "ds.c"
 #include "cpu.c"
 #include "bar.c"
 
@@ -64,6 +65,8 @@ i32 main()
         if (running)
             usleep(1000000);
     }
+
+    f64_list_clear(&s.history);
 
     tcsetattr(STDIN_FILENO, TCSANOW, &old_termios);
     printf("\033[0m\n");  // Reset text color.

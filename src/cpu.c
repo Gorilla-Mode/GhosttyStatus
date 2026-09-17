@@ -1,10 +1,12 @@
 #ifndef UNITY_BUILD
-#include "global_typedefs.c"
+#include "ds.c"
 #endif
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <mach/mach.h>
+
+#define CPU_HISTORY_LIMIT 10
 
 typedef struct
 {
@@ -23,11 +25,7 @@ typedef struct
     u64 nice;
 }cpu_delta;
 
-typedef struct
-{
-    f64 samples[10];
-    size_t index;
-} cpu_history;
+typedef f64_list cpu_history;
 
 static cpu_sample sample_cpu(void)
 {
@@ -98,8 +96,7 @@ static void append_sample(cpu_history* history)
     u64 busy_total = total - d.idle;
     f64 usage = (f64)busy_total / (f64)total * 100.0;
 
-    history->samples[history->index] = usage;
-    history->index = (history->index + 1) % 10;
+    f64_list_append(history, usage, CPU_HISTORY_LIMIT);
 }
 
 static component cpu_timeline(const cpu_history* history)
@@ -110,33 +107,21 @@ static component cpu_timeline(const cpu_history* history)
         output.text = nullptr;
 
     char* text = nullptr;
+    const f64_list_node* node = history->head;
 
-
-    for (size_t i = 0; i < 10; i++)
+    for (size_t i = 0; i < CPU_HISTORY_LIMIT; i++)
     {
-        char* sample = nullptr;
-        if (0 > asprintf(&sample, "%.1lf%%", history->samples[i]))
+        char* next = nullptr;
+        if (0 > asprintf(&next, "%s%s%.1lf%%",
+            text ? text : "", i ? " " : "", node ? node->value : 0.0))
         {
             free(text);
             return output;
         }
-        if (i == 0)
-        {
-            text = sample;
-        }
-        else
-        {
-            char* new_text = nullptr;
-            if (0 > asprintf(&new_text, "%s %s", text, sample))
-            {
-                free(text);
-                free(sample);
-                return output;
-            }
-            free(text);
-            free(sample);
-            text = new_text;
-        }
+        free(text);
+        text = next;
+        if (node)
+            node = node->next;
     }
 
     free(output.text);
