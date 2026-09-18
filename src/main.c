@@ -9,6 +9,7 @@
 #include "ds.c"
 #include "state.c"
 #include "cpu.c"
+#include "mem.c"
 #include "bar.c"
 
 static volatile sig_atomic_t running = 1;
@@ -24,10 +25,12 @@ static void update_state(state* s)
     if (s->current_cpu.initialized)
         s->previous_cpu = s->current_cpu;
     s->current_cpu = sample_cpu();
+    s->current_mem = sample_mem();
     append_sample(s);
 
     s->cpu = cpu_usage(s);
     s->cpu_timeline = cpu_timeline(&s->history);
+    s->mem = mem_usage(s);
 }
 
 i32 main()
@@ -60,10 +63,13 @@ i32 main()
         if (bar_begin(&bar))
         {
             bar_append(&bar, s.cpu);
+            bar_append(&bar, s.mem);
             //bar_append(&bar, s.cpu_timeline);
             bar_draw(&bar, color_background, color_text);
             bar_end(&bar);
         }
+
+        state_clear_components(&s);
 
         if (running)
             usleep(1000000);
