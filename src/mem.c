@@ -45,7 +45,7 @@ static mem_sample sample_mem(void)
 
 static component mem_usage(const state* s)
 {
-    component output = { .header = "Memory", .width = 32 };
+    component output = { .header = "Memory", .width = 19 };
     const mem_sample* sample = &s->current_mem;
     int length;
 
