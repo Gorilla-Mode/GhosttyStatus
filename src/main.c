@@ -69,6 +69,8 @@ i32 main()
             bar_end(&bar);
         }
 
+        state_clear_components(&s);
+
         if (running)
             usleep(1000000);
     }

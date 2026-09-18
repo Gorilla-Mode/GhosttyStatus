@@ -49,7 +49,7 @@ static void bar_copy(char* row, size_t position, size_t width, const char* text)
     memcpy(row + position, text, length);
 }
 
-// Appending consumes the allocated text, even when the component is clipped.
+// Appending copies text; the caller retains ownership, even when clipped.
 static void bar_append(status_bar* bar, component item)
 {
     if (item.width > 0 && bar->position < bar->width)
@@ -71,8 +71,6 @@ static void bar_append(status_bar* bar, component item)
         bar_copy(bar->text, bar->position, width, item.text);
         bar->position += width;
     }
-
-    free(item.text);
 }
 
 static void bar_draw(const status_bar* bar, rgb color_background, rgb color_text)
