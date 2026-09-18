@@ -64,7 +64,7 @@ i32 main()
         {
             bar_append(&bar, s.cpu);
             bar_append(&bar, s.mem);
-            //bar_append(&bar, s.cpu_timeline);
+            bar_append(&bar, s.cpu_timeline);
             bar_draw(&bar, color_background, color_text);
             bar_end(&bar);
         }
