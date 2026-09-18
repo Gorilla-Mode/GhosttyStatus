@@ -16,6 +16,13 @@ clang -std=c23 src/main.c -o gs
 
 Press **Ctrl+C** to exit.
 
+## Tests
+
+```zsh
+clang -std=c23 -g -fsanitize=address -fno-omit-frame-pointer tests/components.c -o /tmp/ghosttystatus-components
+/tmp/ghosttystatus-components
+```
+
 ## Source layout
 
 The project uses a header-free unity build: `main.c` includes the other C files, so compile only `src/main.c`. 
